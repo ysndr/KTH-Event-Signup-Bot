@@ -62,7 +62,7 @@ class YSndrClient(discord.Client):
         if (message.author != message.guild.owner and self._manager_role not in message.author.roles):
             return
 
-        parser = ArgumentParser(description='Create Event')
+        parser = ArgumentParser(prog="event", description='Create Event')
         parser.add_argument('--title', required=True,
                             dest='title', type=str, help='Event title')
         parser.add_argument(nargs=argparse.REMAINDER,
