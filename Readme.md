@@ -12,7 +12,7 @@ Bot to manage event signups on the unofficial KTH Admitted Students 2020 Discord
 ## Installation
 
 1. The environment of this bot is managed using [`nix`](https://nixos.org/nix). On a nix system you can just run `nix-shell nix/shell.nix`.
-   On other systems either install nix or use any other way to install python as well as the `discordpy` and `python-dotenv` package using `pip` (You might wnat to consider a virtualenv for this).
+   On other systems either install nix or use any other way to install python as well as the `discord-py` and `python-dotenv` package using `pip` (You might wnat to consider a virtualenv for this).
 2. copy `example.env` to `.env` and adapt too your server, insert the token you got before.
 3. Finally run the bot using `python bot.py`
 
