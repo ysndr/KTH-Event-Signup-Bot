@@ -152,5 +152,9 @@ class YSndrClient(discord.Client):
         await message.edit(embed=embed)
 
 
-client = YSndrClient()
-client.run(os.getenv('DEB_API_TOKEN'))
+def main():
+    client = YSndrClient()
+    client.run(os.getenv('DEB_API_TOKEN'))
+
+if __name__ == "__main__":
+    main()
