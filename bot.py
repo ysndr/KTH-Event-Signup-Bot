@@ -90,16 +90,13 @@ async def event(ctx: Context, *args):
     if (ctx.author != ctx.guild.owner and ctx.bot._manager_role not in message.author.roles):
         return
 
-    parser = ArgumentParser(prog="event", description='Create Event')
+    parser = ArgumentParser(prog="event", description='Create Event', add_help=False)
     parser.add_argument('--title', required=True,
                         dest='title', type=str, help='Event title')
-    parser.add_argument(nargs=argparse.REMAINDER,
-                        dest='description', help="Description")
     parser.add_argument('--size', dest='n_participants', default=ctx.bot._n_participants,
                         type=int, help='How many can participate in this event')
-
     try:
-        parsed = parser.parse_args(args)
+        parsed, description = parser.parse_known_args(args)
     except TypeError:
         text = parser.format_help()
         await ctx.send(text)
@@ -127,13 +124,62 @@ async def event(ctx: Context, *args):
     embed = Embed()
     embed.title = parsed.title
     embed.add_field(name='Description', value=" ".join(
-        parsed.description[1:]), inline=False)
+        description[1:]), inline=False)
     embed.set_author(name=ctx.author.display_name)
     embed.add_field(
         name='Meta', value=f"||{role.id},{n_participants}||", inline=True)
 
     signup_message: Message = await signup_channel.send(embed=embed)
     await signup_message.add_reaction(ctx.bot._signup_emoji)
+
+
+@bot.command(name="edit")
+async def edit(ctx: Context, *args):
+    if not ctx.bot.setup_run:
+        await ctx.send("> not ready yet!")
+        return
+
+    if (ctx.author != ctx.guild.owner and ctx.bot._manager_role not in message.author.roles):
+        return
+
+    parser = ArgumentParser(prog="edit", description='Create Event', add_help=False)
+    parser.add_argument('--event', required=True, dest='event', type=int, help="Signup message id")
+    parser.add_argument('--title', dest='title', type=str, help='Event title')
+    parser.add_argument('--size', dest='n_participants',
+                        type=int, help='How many can participate in this event')
+    parser.add_argument('--description', dest='description',
+                        type=str, help='description')
+    try:
+        parsed, description = parser.parse_known_args(args)
+    except TypeError:
+        text = parser.format_help()
+        await ctx.send(text)
+        return
+
+    event_message = await ctx.bot._signup_channel.fetch_message(parsed.event)
+    event_embed = event_message.embeds[0]
+    description, participants, meta = event_embed.fields
+
+    if parsed.title:
+        event_embed.title = parsed.title
+    if parsed.description:
+        event_embed.set_field_at(index=0, inline=False,**{
+            "name": "Description",
+            "value": parsed.description,
+        })
+    if parsed.n_participants:
+        role, _ = meta.value[1:][:-1].split(',')
+        event_embed.set_field_at(index=1,**{
+            "name": "Participants",
+            "value": f"{participants.value.split('/')[1]}/{parsed.n_participants}"
+        })
+        event_embed.set_field_at(index=2, **{
+            "name": "Meta",
+            "value": f"||{role},{parsed.n_participants}||"
+        })
+
+    await event_message.edit(embed=event_embed)
+
 
 
 class ArgumentParser(argparse.ArgumentParser):
