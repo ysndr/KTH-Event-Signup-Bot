@@ -1,4 +1,6 @@
 #! /usr/bin/env python3
+from discord.ext.commands import Command, Bot, Context
+from discord import Guild, Member, TextChannel, Role, PermissionOverwrite, Embed, Message, Client
 import discord
 import logging
 import typing
@@ -9,101 +11,27 @@ import argparse
 import dotenv
 
 dotenv.load_dotenv()
-
-from discord import Guild, Member, TextChannel, Role, PermissionOverwrite, Embed, Message
-
-
-
-class ArgumentParser(argparse.ArgumentParser):
-
-    def error(self, message):
-        raise argparse.ArgumentError()
-
-
 logging.basicConfig(level=logging.INFO)
 
 
-class YSndrClient(discord.Client):
+class KTHBot(Bot):
     setup_run = False
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
     async def on_ready(self):
         print('Logged on as {0}!'.format(self.user))
-        
+
         guild = self.get_guild(int(os.getenv('DEB_GUILD')))
 
-
         self._manager_role = guild.get_role(int(os.getenv('DEB_MANAGER_ROLE')))
-        self._signup_channel = guild.get_channel(
+        self._signup_channel: TextChannel = guild.get_channel(
             int(os.getenv('DEB_SIGNUP_CHANNEL')))
         self._signup_emoji = os.getenv('DEB_EMOJI')
         self._n_participants = int(os.getenv('DEB_DEFAULT_SIZE'))
 
         self.setup_run = True
-
-    async def on_message(self, message: discord.Message):
-        if message.content[0:2] != '$ ':
-            return
-
-        command = list(shlex.shlex(
-            message.content[1:], posix=True, punctuation_chars=True))
-
-        args = command[1:]
-        if command[0] == 'event':
-            await self.event(args, message)
-
-
-
-    async def event(self, args, message: discord.Message):
-
-        if not self.setup_run:
-            await message.channel.send(content="> not ready yet!")
-            return
-
-        if (message.author != message.guild.owner and self._manager_role not in message.author.roles):
-            return
-
-        parser = ArgumentParser(prog="event", description='Create Event')
-        parser.add_argument('--title', required=True,
-                            dest='title', type=str, help='Event title')
-        parser.add_argument(nargs=argparse.REMAINDER,
-                            dest='description', help="Description")
-        parser.add_argument('--size', dest='n_participants', default=self._n_participants,
-                            type=int, help='How many can participate in this event')
-
-        try:
-            parsed = parser.parse_args(args,)
-        except TypeError:
-            text = parser.format_help()
-            await message.channel.send(text)
-            return
-
-        guild: Guild = message.guild
-
-        signup_channel: TextChannel = self._signup_channel
-        root_category = signup_channel.category
-
-        role = await guild.create_role(name=f"ep-{parsed.title}")
-        event_channel = await guild.create_text_channel(parsed.title, category=root_category, overwrites={
-            role: discord.PermissionOverwrite(read_messages=True),
-            guild.default_role: discord.PermissionOverwrite(
-                read_messages=False),
-            self._manager_role: discord.PermissionOverwrite(read_messages=True),
-            guild.me: discord.PermissionOverwrite(read_messages=True),
-
-        })
-
-        n_participants = parsed.n_participants
-
-        embed = Embed()
-        embed.title = parsed.title
-        embed.add_field(name='Description', value=" ".join(
-            parsed.description[1:]), inline=False)
-        embed.set_author(name=message.author.display_name)
-        embed.add_field(
-            name='Meta', value=f"||{role.id},{n_participants}||", inline=True)
-
-        signup_message: Message = await signup_channel.send(embed=embed)
-        await signup_message.add_reaction(self._signup_emoji)
 
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
         await self.toggle_role(payload)
@@ -134,7 +62,7 @@ class YSndrClient(discord.Client):
         if role in member.roles:
             await member.remove_roles(role)
         else:
-            if len(role.members) < size +1: # -1 fo the bot itself
+            if len(role.members) < size + 1:  # -1 fo the bot itself
                 await member.add_roles(role)
             else:
                 await message.remove_reaction(self._signup_emoji, member)
@@ -151,10 +79,67 @@ class YSndrClient(discord.Client):
                 index=-1, **participants_info)
         await message.edit(embed=embed)
 
+bot = KTHBot(command_prefix="$ ")
 
-def main():
-    client = YSndrClient()
-    client.run(os.getenv('DEB_API_TOKEN'))
+@bot.command(name="event")
+async def event(ctx: Context, *args):
+    if not ctx.bot.setup_run:
+        await ctx.send("> not ready yet!")
+        return
+
+    if (ctx.author != ctx.guild.owner and ctx.bot._manager_role not in message.author.roles):
+        return
+
+    parser = ArgumentParser(prog="event", description='Create Event')
+    parser.add_argument('--title', required=True,
+                        dest='title', type=str, help='Event title')
+    parser.add_argument(nargs=argparse.REMAINDER,
+                        dest='description', help="Description")
+    parser.add_argument('--size', dest='n_participants', default=ctx.bot._n_participants,
+                        type=int, help='How many can participate in this event')
+
+    try:
+        parsed = parser.parse_args(args)
+    except TypeError:
+        text = parser.format_help()
+        await ctx.send(text)
+        return
+
+    guild: Guild = ctx.guild
+
+    signup_channel: TextChannel = ctx.bot._signup_channel
+    root_category = signup_channel.category
+
+    role = await guild.create_role(name=f"ep-{parsed.title}")
+    event_channel = await guild.create_text_channel(
+        parsed.title,
+        category=root_category,
+        overwrites={
+            role: discord.PermissionOverwrite(read_messages=True),
+            guild.default_role: discord.PermissionOverwrite(
+                read_messages=False),
+            ctx.bot._manager_role: discord.PermissionOverwrite(read_messages=True),
+            guild.me: discord.PermissionOverwrite(read_messages=True),
+        })
+
+    n_participants = parsed.n_participants
+
+    embed = Embed()
+    embed.title = parsed.title
+    embed.add_field(name='Description', value=" ".join(
+        parsed.description[1:]), inline=False)
+    embed.set_author(name=ctx.author.display_name)
+    embed.add_field(
+        name='Meta', value=f"||{role.id},{n_participants}||", inline=True)
+
+    signup_message: Message = await signup_channel.send(embed=embed)
+    await signup_message.add_reaction(ctx.bot._signup_emoji)
+
+
+class ArgumentParser(argparse.ArgumentParser):
+
+    def error(self, message):
+        raise argparse.ArgumentError()
 
 if __name__ == "__main__":
-    main()
+    bot.run(os.getenv('DEB_API_TOKEN'))
