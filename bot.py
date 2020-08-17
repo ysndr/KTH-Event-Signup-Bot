@@ -168,7 +168,7 @@ async def edit(ctx: Context, *args):
             "value": parsed.description,
         })
     if parsed.n_participants:
-        role, _ = meta.value[1:][:-1].split(',')
+        role, _ = meta.value[2:][:-1].split(',')
         event_embed.set_field_at(index=1,**{
             "name": "Participants",
             "value": f"{participants.value.split('/')[1]}/{parsed.n_participants}"
